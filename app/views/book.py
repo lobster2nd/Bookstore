@@ -1,28 +1,34 @@
-from flask import Blueprint, jsonify, request
-from database import db, Books
+import dataclasses
+import json
+
+from flask import Blueprint, current_app, request
+
+from context import get_context
+from domain.book import Book
 
 bp = Blueprint("book", __name__)
 
 
 @bp.route("/")
 def get_books():
-    books = Books.query.all()
-    return jsonify([book.serialize() for book in books])
+    ctx = get_context(current_app)
+
+    return json.dumps([dataclasses.asdict(b) for b in ctx.book_service.get()])
 
 
 @bp.route("/", methods=["POST"])
 def add_book():
-    data = request.get_json()
-    book = Books(id=data["id"], book=data["book"])
-    db.session.add(book)
-    db.session.commit()
-    return jsonify(data)
+    ctx = get_context(current_app)
+
+    book = Book(**request.json)
+    book_id = ctx.book_service.add(book)
+    return {"id": book_id, "book": book}
 
 
 @bp.route("/<id>", methods=["DELETE"])
 def delete_book(id):
-    book = Books.query.get(id)
-    if book:
-        db.session.delete(book)
-        db.session.commit()
-    return jsonify({})
+    ctx = get_context(current_app)
+
+    ctx.book_service.delete(id)
+
+    return {}
